@@ -1,0 +1,24 @@
+{
+  "name": "avifgun",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "nodemon"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cids": "^1.1.6",
+    "file-type": "^16.5.0",
+    "multihashing-async": "^2.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^15.6.1",
+    "nodemon": "^2.0.7",
+    "typescript": "^4.3.2"
+  }
+}
