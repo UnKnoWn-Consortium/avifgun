@@ -1,7 +1,7 @@
 {
   "name": "avifgun",
   "version": "1.0.0",
-  "description": "",
+  "description": "A CLI utility to convert images to AVIF en masse",
   "main": "./dist/index.js",
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
     "cids": "^1.1.6",
     "cli-progress": "^3.11.2",
     "commander": "^9.4.0",
+    "date-fns": "^2.29.1",
     "file-type": "^17.1.6",
     "lodash-es": "^4.17.21",
     "multihashing-async": "^2.1.4"
