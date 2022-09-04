@@ -18,6 +18,7 @@ import progressBar from "./progressBar.js";
 import sum from "../../utilities/statistics/sum.js";
 import median from "../../utilities/statistics/median.js";
 import stdDev from "../../utilities/statistics/stdDev.js";
+import {start} from "repl";
 
 const MAX_CPU_CORES = 8;
 
@@ -83,7 +84,7 @@ async function avifgun (input: string, output: string | undefined, options: Comm
             (chunk: string[], ind) =>
                 progressBar.create(chunk.length, 0, { "title": `Queue ${ ind + 1 } `, })
         );
-        const footer = progressBar.create(100, 0, {}, { "format": "{avifSize} vs. {originalSize} | {delta} | DSSIM: {dssim} | {elapsed} elapsed"});
+        const footer = progressBar.create(100, 0, {}, { "format": "{avifSize} vs. {originalSize} | {delta} | DSSIM: {dssim} | {elapsed} elapsed | {fps}" });
         footer.update({ "avifSize": "TBA", "originalSize": "TBA", "delta": "TBA%", "dssim": "TBA", "elapsed": "0 second" });
 
         const startTime = hrtime.bigint();
@@ -108,9 +109,9 @@ async function avifgun (input: string, output: string | undefined, options: Comm
                                 const result = await avifenc(inputPath, outputPath);
                                 results.push(result);
 
-                                const dssimVal = await dssim(inputPath, outputPath);
-                                totalDSSIM += dssimVal;
-                                dssims.push(dssimVal);
+                                //const dssimVal = await dssim(inputPath, outputPath);
+                                //totalDSSIM += dssimVal;
+                                //dssims.push(dssimVal);
 
                                 const { colorSizeBytes, alphaSizeBytes, } = result;
                                 totalAVIFSize += colorSizeBytes + alphaSizeBytes;
@@ -122,7 +123,15 @@ async function avifgun (input: string, output: string | undefined, options: Comm
 
                                 overall.increment();
                                 chunkBar.increment();
-                                footer.update({ "avifSize": bytes(totalAVIFSize), "originalSize": bytes(totalOriginalSize), "delta": `${saving.toFixed(2)}%`, "dssim": (totalDSSIM / dssims.length).toFixed(8) });
+                                const tick = hrtime.bigint();
+                                footer.update({
+                                    "avifSize": bytes(totalAVIFSize),
+                                    "originalSize": bytes(totalOriginalSize),
+                                    "delta": `${saving.toFixed(2)}%`,
+                                    "dssim": (totalDSSIM / dssims.length).toFixed(8),
+                                    "elapsed": formatDuration({ "seconds": Number(tick - startTime) / 1_000_000_000 }),
+                                    "fps": "",
+                                });
                             }
                         }
                     }
@@ -138,8 +147,8 @@ async function avifgun (input: string, output: string | undefined, options: Comm
         const sizes = results.map(({ colorSizeBytes, alphaSizeBytes, }) => colorSizeBytes + alphaSizeBytes);
         console.log(`**SIZE**`);
         console.log(`Max: ${ bytes(Math.max(...sizes)) } | Min: ${ bytes(Math.min(...sizes)) } | Mean: ${ bytes(totalAVIFSize / dir.length) } | Median: ${ bytes(<number>median(sizes)) } | Std. Dev.: ${ bytes(<number>stdDev(sizes)) }`)
-        console.log(`**DSSIM**`);
-        console.log(`Worst: ${ Math.max(...dssims).toFixed(8) } | Best: ${ Math.min(...dssims).toFixed(8) } | Mean: ${ (<number>sum(dssims) / dir.length).toFixed(8) } | Median: ${ (<number>median(dssims)).toFixed(8) } | Std. Dev.: ${ (<number>stdDev(dssims)).toFixed(8) }`);
+        //console.log(`**DSSIM**`);
+        //console.log(`Worst: ${ Math.max(...dssims).toFixed(8) } | Best: ${ Math.min(...dssims).toFixed(8) } | Mean: ${ (<number>sum(dssims) / dir.length).toFixed(8) } | Median: ${ (<number>median(dssims)).toFixed(8) } | Std. Dev.: ${ (<number>stdDev(dssims)).toFixed(8) }`);
 
         // TODO: input image resolution distribution
     } catch (e) {
