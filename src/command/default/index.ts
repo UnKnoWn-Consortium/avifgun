@@ -103,7 +103,10 @@ async function avifgun (input: string, output: string | undefined, options: Comm
                             const fileType = await fileTypeFromFile(inputPath);
 
                             const regex = /image\/\S+/g;
-                            if (fileType?.mime && regex.test(fileType.mime)) {
+                            const isImage = regex.test(fileType?.mime ?? "")
+                            const isSvg = fileType?.mime === "application/xml" && inputPath.endsWith(".svg");
+
+                            if (isImage || isSvg) {
                                 // console.log(`Processing ${ inputPath }...`);
 
                                 const result = await avifenc(inputPath, outputPath);

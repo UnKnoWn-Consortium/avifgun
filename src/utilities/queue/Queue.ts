@@ -1,10 +1,8 @@
 import { EventEmitter } from "node:events";
+import { webcrypto, } from "crypto";
 
 import Worker from "./Worker.js";
 import Job from "./Job.js";
-
-import { v4 as uuidv4 } from "uuid";
-
 
 class Queue extends EventEmitter {
     #jobs: Job[];
@@ -30,7 +28,7 @@ class Queue extends EventEmitter {
 
     add (job: Job): string {
         // TODO: create ID
-        uuidv4();
+        webcrypto.randomUUID();
         this.#jobs.push(job)
         // TODO: assign job to idle worker
         return "";
