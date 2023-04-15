@@ -1,36 +1,40 @@
 import { hrtime } from "node:process";
-import { cpus } from "node:os";
 import { normalize, resolve, parse, } from "node:path";
 import { stat, mkdir, readdir, } from "node:fs/promises";
 
 import { Command } from "commander";
-import { SingleBar, } from "cli-progress";
 import { fileTypeFromFile } from "file-type";
-import { chunk } from "lodash-es";
 import bytes from "bytes";
 import { formatDuration } from "date-fns";
+
+import { parallel } from "radash";
 
 import dssim from "../../utilities/dssim/index.js";
 import avifenc from "../../utilities/avifenc/index.js";
 import { AVIFStdout, } from "./processAVIFStdout.js";
-import progressBar from "./progressBar.js";
+import { progressBarFactory } from "./progressBars.js";
 
 import sum from "../../utilities/statistics/sum.js";
 import median from "../../utilities/statistics/median.js";
 import stdDev from "../../utilities/statistics/stdDev.js";
-import {start} from "repl";
+import { clearInterval } from "node:timers";
 
-const MAX_CPU_CORES = 8;
+const MAX_CPU_THREADS = 8;
 
 interface CommandOptions {
     recursive: boolean;
     verbose: boolean;
+    liveDssim: boolean;
+    thread: string;
 }
 
 async function avifgun (input: string, output: string | undefined, options: CommandOptions, command: Command) {
     console.log(input, output, options);
 
     const isRecursive = options.recursive;
+    const runLiveDSSIM = options.liveDssim;
+    const threads = parseInt(options.thread);
+
     const target = normalize(input);
 
     let info;
@@ -67,7 +71,10 @@ async function avifgun (input: string, output: string | undefined, options: Comm
 
     try {
         const dir = await readdir(target);
-        const overall = progressBar.create(dir.length, 0, { "title": "Overall ", });
+        const coreCount = threads > MAX_CPU_THREADS ? MAX_CPU_THREADS : threads - 2;
+
+        const { bars, header, chunkProgressBars, footer } = progressBarFactory(dir.length, coreCount);
+        footer.update({ "avifSize": "TBA", "originalSize": "TBA", "delta": "TBA%", "dssim": "TBA", "elapsed": "0 second" });
 
         let totalOriginalSize = 0;
         let totalAVIFSize = 0;
@@ -76,76 +83,78 @@ async function avifgun (input: string, output: string | undefined, options: Comm
         const results: AVIFStdout[] = [];
         const dssims: number[] = [];
 
-        // TODO: refactor it into a queue-worker structure for extensibility
         // TODO: deduplicate files to reduce workload
-        const coreCount = cpus().length > MAX_CPU_CORES ? MAX_CPU_CORES : cpus().length - 1;
-        const chunks = chunk(dir, Math.ceil(dir.length / coreCount));
-        const chunkProgressBars: SingleBar[] = chunks.map(
-            (chunk: string[], ind) =>
-                progressBar.create(chunk.length, 0, { "title": `Queue ${ ind + 1 } `, })
-        );
-        const footer = progressBar.create(100, 0, {}, { "format": "{avifSize} vs. {originalSize} | {delta} | DSSIM: {dssim} | {elapsed} elapsed | {fps}" });
-        footer.update({ "avifSize": "TBA", "originalSize": "TBA", "delta": "TBA%", "dssim": "TBA", "elapsed": "0 second" });
 
         const startTime = hrtime.bigint();
-
-        await Promise.allSettled(
-            chunks.map(
-                async (chunk, ind) => {
-                    const chunkBar = chunkProgressBars[ind];
-                    for (const item of chunk) {
-                        const inputPath = normalize(`${ target }\\\\${ item }`);
-                        const stats = await stat(inputPath);
-                        if (stats.isFile()) {
-                            const { name } = parse(inputPath);
-                            const outputPath = resolve(outputDir, `${ name }.avif`);
-
-                            const fileType = await fileTypeFromFile(inputPath);
-
-                            const regex = /image\/\S+/g;
-                            const isImage = regex.test(fileType?.mime ?? "")
-                            const isSvg = fileType?.mime === "application/xml" && inputPath.endsWith(".svg");
-
-                            if (isImage || isSvg) {
-                                // console.log(`Processing ${ inputPath }...`);
-
-                                const result = await avifenc(inputPath, outputPath);
-                                results.push(result);
-
-                                //const dssimVal = await dssim(inputPath, outputPath);
-                                //totalDSSIM += dssimVal;
-                                //dssims.push(dssimVal);
-
-                                const { colorSizeBytes, alphaSizeBytes, } = result;
-                                totalAVIFSize += colorSizeBytes + alphaSizeBytes;
-
-                                const { size } = await stat(inputPath);
-                                totalOriginalSize += size;
-
-                                const saving = (totalAVIFSize - totalOriginalSize) / totalOriginalSize * 100;
-
-                                overall.increment();
-                                chunkBar.increment();
-                                const tick = hrtime.bigint();
-                                footer.update({
-                                    "avifSize": bytes(totalAVIFSize),
-                                    "originalSize": bytes(totalOriginalSize),
-                                    "delta": `${saving.toFixed(2)}%`,
-                                    "dssim": (totalDSSIM / dssims.length).toFixed(8),
-                                    "elapsed": formatDuration({ "seconds": Number(tick - startTime) / 1_000_000_000 }),
-                                    "fps": "",
-                                });
-                            }
-                        }
-                    }
-                }
-            )
+        const ticker = setInterval(
+            () => {
+                const tick = hrtime.bigint();
+                const seconds = Number(tick - startTime) / 1_000_000_000;
+                // @ts-ignore
+                const current = header.value;
+                footer.update({
+                    "elapsed": formatDuration({ "seconds": parseFloat(seconds.toFixed(2)) }),
+                    "fps": current === 0 ? "TBD" : `${ (current / seconds).toFixed(2) } images per second`,
+                });
+            },
+            100
         );
 
-        progressBar.stop();
+        await parallel(
+            coreCount,
+            dir,
+            async (entry, index) => {
+                const chunkBar = chunkProgressBars[index];
+                chunkBar.setTotal(chunkBar.getTotal() === 999_999 ? 1 : chunkBar.getTotal() + 1);
+                const inputPath = normalize(`${ target }\\\\${ entry }`);
+                const stats = await stat(inputPath);
+                if (!stats.isFile()) {
+                    return;
+                }
 
-        // const saving = (totalAVIFSize - totalOriginalSize) / totalOriginalSize * 100;
-        // console.log(`Size: ${ bytes(totalAVIFSize) } vs. ${ bytes(totalOriginalSize) } | ${ saving.toFixed(2) }%`);
+                const { name } = parse(inputPath);
+                const outputPath = resolve(outputDir, `${ name }.avif`);
+
+                const fileType = await fileTypeFromFile(inputPath);
+
+                const regex = /image\/\S+/g;
+                const isImage = regex.test(fileType?.mime ?? "")
+                const isSvg = fileType?.mime === "application/xml" && inputPath.endsWith(".svg");
+
+                if (!isImage && !isSvg) {
+                    return;
+                }
+
+                // console.log(`Processing ${ inputPath }...`);
+
+                const result = await avifenc(inputPath, outputPath);
+                results.push(result);
+
+                //const dssimVal = await dssim(inputPath, outputPath);
+                //totalDSSIM += dssimVal;
+                //dssims.push(dssimVal);
+
+                const { colorSizeBytes, alphaSizeBytes, } = result;
+                totalAVIFSize += colorSizeBytes + alphaSizeBytes;
+
+                const { size } = await stat(inputPath);
+                totalOriginalSize += size;
+
+                const saving = (totalAVIFSize - totalOriginalSize) / totalOriginalSize * 100;
+
+                header.increment();
+                chunkBar.increment();
+                footer.update({
+                    "avifSize": bytes(totalAVIFSize),
+                    "originalSize": bytes(totalOriginalSize),
+                    "delta": `${saving.toFixed(2)}%`,
+                    "dssim": (totalDSSIM / dssims.length).toFixed(8),
+                });
+            }
+        );
+
+        bars.stop();
+        clearInterval(ticker);
 
         const sizes = results.map(({ colorSizeBytes, alphaSizeBytes, }) => colorSizeBytes + alphaSizeBytes);
         console.log(`**SIZE**`);

@@ -1,6 +1,6 @@
 {
   "name": "avifgun",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A CLI utility to convert images to AVIF en masse",
   "main": "./dist/index.js",
   "type": "module",
@@ -17,19 +17,20 @@
     "app-root-path": "^3.1.0",
     "bytes": "^3.1.2",
     "cids": "^1.1.6",
-    "cli-progress": "^3.11.2",
-    "commander": "^9.5.0",
+    "cli-progress": "^3.12.0",
+    "commander": "^10.0.0",
     "date-fns": "^2.29.3",
-    "file-type": "^18.0.0",
-    "lodash-es": "^4.17.21",
+    "file-type": "^18.2.1",
     "multihashing-async": "^2.1.4",
+    "papaparse": "^5.4.1",
+    "radash": "^10.8.1",
     "v8-compile-cache": "^2.3.0"
   },
   "devDependencies": {
     "@types/bytes": "^3.1.1",
     "@types/cli-progress": "^3.11.0",
-    "@types/lodash-es": "^4.17.6",
-    "@types/node": "^18.11.18",
-    "typescript": "^4.9.4"
+    "@types/lodash-es": "^4.17.7",
+    "@types/node": "^18.15.11",
+    "typescript": "^5.0.4"
   }
 }

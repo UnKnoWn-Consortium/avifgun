@@ -1,3 +1,5 @@
+import os from "node:os";
+
 import "v8-compile-cache";
 
 import { Command } from "commander";
@@ -16,8 +18,13 @@ program
     .option("-v, --verbose", "Execute in verbose mode", false)
     .option(
         "-d, --live-dssim",
-        "Compute DSSIM statistics for the converted AVIF images live (Warning: significant reduce fps)",
+        "Compute DSSIM statistics for the converted AVIF images live (Warning: significantly reduce images processed per second)",
         false
+    )
+    .option(
+        "-t, --thread <numThread>",
+        "Compute DSSIM statistics for the converted AVIF images live (Warning: significantly reduce images processed per second)",
+        !!os?.availableParallelism ? os?.availableParallelism().toString() : os?.cpus().length.toString()
     )
     .action(avifgun);
 
