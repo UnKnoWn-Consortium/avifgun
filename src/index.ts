@@ -15,7 +15,7 @@ program
     .argument("<input>", "Path to the input (file or folder depending on whether recursive mode is enabled)")
     .argument("[output]", "Path to the output (file or folder depending on whether recursive mode is enabled)")
     .option("-R, --recursive", "Execute in recursive mode", false)
-    .option("-v, --verbose", "Execute in verbose mode", false)
+    .option("--verbose", "Execute in verbose mode", false)
     .option(
         "-d, --live-dssim",
         "Compute DSSIM statistics for the converted AVIF images live (Warning: significantly reduce images processed per second)",

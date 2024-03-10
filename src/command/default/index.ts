@@ -103,8 +103,8 @@ async function avifgun (input: string, output: string | undefined, options: Comm
         await parallel(
             coreCount,
             dir,
-            async (entry, index) => {
-                const chunkBar = chunkProgressBars[index];
+            async (entry, index, queueIndex) => {
+                const chunkBar = chunkProgressBars[queueIndex];
                 chunkBar.setTotal(chunkBar.getTotal() === 999_999 ? 1 : chunkBar.getTotal() + 1);
                 const inputPath = normalize(`${ target }\\\\${ entry }`);
                 const stats = await stat(inputPath);
